@@ -26,9 +26,9 @@ function CopyField({ label, value }) {
         <code className="text-xs sm:text-sm break-all text-white/90">{value}</code>
         <button
           onClick={() => { navigator.clipboard?.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-          className="ml-auto shrink-0 text-white/60 hover:text-emerald-300 transition-colors"
+          className="ml-auto shrink-0 text-white/60 hover:text-white transition-colors"
         >
-          {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+          {copied ? <Check className="h-4 w-4 text-white" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
     </div>
@@ -51,8 +51,8 @@ export default function OrderModal({ order, open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md border-white/10 bg-[#0d0d12] p-0 gap-0 overflow-hidden max-h-[92vh] overflow-y-auto">
-        <div className="bg-gradient-to-b from-emerald-500/15 to-transparent px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2 text-emerald-300 text-xs font-medium">
+        <div className="bg-gradient-to-b from-white/10 to-transparent px-5 pt-5 pb-4">
+          <div className="flex items-center gap-2 text-white/80 text-xs font-medium">
             <ShieldCheck className="h-4 w-4" /> {methodLabel}
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
@@ -81,7 +81,7 @@ export default function OrderModal({ order, open, onOpenChange }) {
           </div>
 
           {countdown && (
-            <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
+            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-xs text-white/70">
               <Clock className="h-4 w-4" />
               Deposit within <span className="font-semibold">{countdown}</span> · send on Solana only.
             </div>

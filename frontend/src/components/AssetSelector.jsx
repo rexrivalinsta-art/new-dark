@@ -53,7 +53,7 @@ export default function AssetSelector({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or symbol"
-                className="pl-9 bg-white/5 border-white/10 focus-visible:ring-violet-500"
+                className="pl-9 bg-white/5 border-white/10 focus-visible:ring-white/40"
               />
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function AssetSelector({
             <>
               <button
                 onClick={() => setActiveNetwork(null)}
-                className="text-xs text-violet-300 hover:text-violet-200 px-3 mb-1"
+                className="text-xs text-white/70 hover:text-white px-3 mb-1"
               >
                 &larr; All networks
               </button>

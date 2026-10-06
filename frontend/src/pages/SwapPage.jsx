@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import SwapCard from '../components/SwapCard';
 import HowItWorks from '../components/HowItWorks';
 import HelpButton from '../components/HelpButton';
+import Footer from '../components/Footer';
 
 export default function SwapPage() {
   return (
@@ -24,6 +25,7 @@ export default function SwapPage() {
 
         <HowItWorks />
       </main>
+      <Footer />
       <HelpButton />
     </div>
   );

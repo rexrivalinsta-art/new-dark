@@ -32,12 +32,12 @@ function MethodTabs({ method, setMethod }) {
             onClick={() => setMethod(m.id)}
             className={`rounded-xl py-2.5 text-center transition-all ${
               active
-                ? 'bg-gradient-to-b from-emerald-400/90 to-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                ? 'bg-white text-black shadow-lg shadow-white/10'
                 : 'text-white/60 hover:text-white hover:bg-white/5'
             }`}
           >
             <div className="text-sm font-semibold">{m.label}</div>
-            <div className={`text-[0.68rem] ${active ? 'text-black/60' : 'text-white/35'}`}>{m.sub}</div>
+            <div className={`text-[0.68rem] ${active ? 'text-black/55' : 'text-white/35'}`}>{m.sub}</div>
           </button>
         );
       })}
@@ -244,7 +244,7 @@ export default function SwapCard() {
       {/* direction */}
       <div className="relative flex justify-center my-1">
         <div className="h-9 w-9 rounded-xl border border-white/10 bg-[#121218] flex items-center justify-center">
-          <ArrowDown className="h-4 w-4 text-emerald-300" />
+          <ArrowDown className="h-4 w-4 text-white" />
         </div>
       </div>
 
@@ -290,7 +290,7 @@ export default function SwapCard() {
           <input
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
-            placeholder="Your receiving address"
+            placeholder={recvToken ? `Your ${recvToken.chainName} receiving address` : 'Your receiving address'}
             className="w-full bg-transparent text-sm outline-none placeholder:text-white/30"
           />
           <button onClick={() => paste(setDestination)} className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/70 hover:bg-white/10 transition-colors">
@@ -334,7 +334,7 @@ export default function SwapCard() {
         disabled={!canReview}
         className={`mt-5 w-full rounded-2xl py-3.5 text-sm font-semibold transition-all inline-flex items-center justify-center gap-2 ${
           canReview
-            ? 'bg-gradient-to-b from-emerald-400 to-emerald-500 text-black hover:brightness-110 shadow-lg shadow-emerald-500/25'
+            ? 'bg-white text-black hover:bg-white/90 shadow-lg shadow-white/10'
             : 'bg-white/5 text-white/40 cursor-not-allowed'
         }`}
       >
