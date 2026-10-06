@@ -5,6 +5,8 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
+import time
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List
@@ -70,10 +72,16 @@ async def get_status_checks():
 # ---------------------------------------------------------------------------
 # DarkSwap passthrough proxy (server-side -> avoids browser CORS / auth issues)
 # Maps  /api/ds/<path>  ->  https://darkswap.app/api/swap/<path>
+#
+# Hardened for stability so the upstream does not rate-limit / block us:
+#  * one shared keep-alive connection pool (no per-request socket churn)
+#  * automatic retry with exponential backoff on 429 / 5xx / network errors
+#  * short TTL cache for the near-static token & chain lists (cuts upstream hits)
 # ---------------------------------------------------------------------------
 DS_BASE = "https://darkswap.app/api/swap"
 DS_HEADERS = {
     "accept": "application/json",
+    "accept-language": "en-US,en;q=0.9",
     "content-type": "application/json",
     "origin": "https://darkswap.app",
     "referer": "https://darkswap.app/swap",
@@ -84,6 +92,27 @@ DS_HEADERS = {
 }
 # Only these path prefixes are allowed to be proxied.
 DS_ALLOWED = ("tokens", "chains", "quotes", "orders", "near")
+RETRY_STATUS = {429, 500, 502, 503, 504}
+
+# Shared async HTTP client with a bounded keep-alive pool (created lazily).
+_ds_client: httpx.AsyncClient | None = None
+# Tiny in-memory TTL cache for idempotent list endpoints: key -> (ts, status, body)
+_ds_cache: dict = {}
+
+
+def _get_ds_client() -> httpx.AsyncClient:
+    global _ds_client
+    if _ds_client is None or _ds_client.is_closed:
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50,
+                              keepalive_expiry=30.0)
+        _ds_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(45.0, connect=10.0),
+            limits=limits,
+            headers=DS_HEADERS,
+            follow_redirects=True,
+            http2=False,
+        )
+    return _ds_client
 
 
 def _ds_allowed(path: str) -> bool:
@@ -91,22 +120,67 @@ def _ds_allowed(path: str) -> bool:
                for p in DS_ALLOWED) or path.split("/")[0] in DS_ALLOWED
 
 
+def _cache_ttl(path: str) -> int:
+    """How long (seconds) a GET on this path may be cached. 0 = never cache."""
+    base = path.split("?")[0]
+    if base.endswith("tokens") or base == "tokens":
+        return 60
+    if base.endswith("chains") or base == "chains":
+        return 300
+    return 0  # quotes / orders / status must always be live
+
+
+async def _ds_request(method: str, url: str, params=None, content=None, retries: int = 2):
+    """Perform the upstream request with retry + exponential backoff."""
+    client = _get_ds_client()
+    last_exc = None
+    resp = None
+    for attempt in range(retries + 1):
+        try:
+            resp = await client.request(method, url, params=params, content=content)
+            if resp.status_code in RETRY_STATUS and attempt < retries:
+                await asyncio.sleep(0.4 * (2 ** attempt))
+                continue
+            return resp
+        except httpx.HTTPError as e:
+            last_exc = e
+            if attempt < retries:
+                await asyncio.sleep(0.4 * (2 ** attempt))
+                continue
+            raise
+    if resp is not None:
+        return resp
+    raise last_exc
+
+
 @api_router.get("/ds/{path:path}")
 async def ds_proxy_get(path: str, request: Request):
     if not _ds_allowed(path):
         return Response(content='{"error":"path not allowed"}', status_code=403,
                         media_type="application/json")
-    url = f"{DS_BASE}/{path}"
     params = dict(request.query_params)
+    ttl = _cache_ttl(path)
+    key = f"GET {path}?{sorted(params.items())}"
+    now = time.time()
+    if ttl and key in _ds_cache:
+        ts, status, body = _ds_cache[key]
+        if now - ts < ttl:
+            return Response(content=body, status_code=status, media_type="application/json")
+    url = f"{DS_BASE}/{path}"
     try:
-        async with httpx.AsyncClient(timeout=45) as client:
-            r = await client.get(url, params=params, headers=DS_HEADERS)
-        return Response(content=r.content, status_code=r.status_code,
-                        media_type="application/json")
+        r = await _ds_request("GET", url, params=params)
     except httpx.HTTPError as e:
         logger.error(f"ds proxy GET {path} failed: {e}")
+        # serve stale cache if we have any, rather than erroring out
+        if key in _ds_cache:
+            _, status, body = _ds_cache[key]
+            return Response(content=body, status_code=status, media_type="application/json")
         return Response(content='{"error":"upstream unreachable"}', status_code=502,
                         media_type="application/json")
+    if ttl and r.status_code == 200:
+        _ds_cache[key] = (now, r.status_code, r.content)
+    return Response(content=r.content, status_code=r.status_code,
+                    media_type="application/json")
 
 
 @api_router.post("/ds/{path:path}")
@@ -117,8 +191,7 @@ async def ds_proxy_post(path: str, request: Request):
     url = f"{DS_BASE}/{path}"
     body = await request.body()
     try:
-        async with httpx.AsyncClient(timeout=45) as client:
-            r = await client.post(url, content=body, headers=DS_HEADERS)
+        r = await _ds_request("POST", url, content=body)
         return Response(content=r.content, status_code=r.status_code,
                         media_type="application/json")
     except httpx.HTTPError as e:
@@ -148,3 +221,6 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    global _ds_client
+    if _ds_client is not None and not _ds_client.is_closed:
+        await _ds_client.aclose()

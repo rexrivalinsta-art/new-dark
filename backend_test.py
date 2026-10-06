@@ -319,23 +319,23 @@ def test_privacy_swap_near():
     print("TESTING PRIVACY SWAP (NEAR Intents)")
     print("="*80)
     
-    # Step 6: Get NEAR source tokens and find SOL on Solana
-    print("\n[Step 6] GET /api/ds/near/tokens?side=source")
+    # Step 6a: Get NEAR source tokens and find SOL on Solana
+    print("\n[Step 6a] GET /api/ds/near/tokens?side=source")
     response, error = make_request("GET", "near/tokens", params={"side": "source"})
     
     if error:
-        log_test("Step 6: Get NEAR source tokens", False, error)
+        log_test("Step 6a: Get NEAR source tokens", False, error)
         return
     
     if response.status_code != 200:
-        log_test("Step 6: Get NEAR source tokens", False, 
+        log_test("Step 6a: Get NEAR source tokens", False, 
                 f"Expected 200, got {response.status_code}: {response.text}")
         return
     
     try:
         data = response.json()
         if "tokens" not in data or not isinstance(data["tokens"], list):
-            log_test("Step 6: Get NEAR source tokens", False, 
+            log_test("Step 6a: Get NEAR source tokens", False, 
                     f"Expected {{tokens:[...]}} structure, got: {data}")
             return
         
@@ -347,41 +347,41 @@ def test_privacy_swap_near():
                 break
         
         if not near_sol_token:
-            log_test("Step 6: Get NEAR source tokens", False, 
+            log_test("Step 6a: Get NEAR source tokens", False, 
                     f"SOL token on Solana not found in {len(data['tokens'])} tokens")
             return
         
         near_sol_id = near_sol_token.get("id")
         if not near_sol_id:
-            log_test("Step 6: Get NEAR source tokens", False, 
+            log_test("Step 6a: Get NEAR source tokens", False, 
                     "SOL token found but has no 'id' field")
             return
         
-        log_test("Step 6: Get NEAR source tokens", True, 
+        log_test("Step 6a: Get NEAR source tokens", True, 
                 f"Found {len(data['tokens'])} tokens, SOL (Solana) id: {near_sol_id}", 
                 {"token_count": len(data["tokens"]), "near_sol_id": near_sol_id})
         
     except Exception as e:
-        log_test("Step 6: Get NEAR source tokens", False, f"JSON parse error: {str(e)}")
+        log_test("Step 6a: Get NEAR source tokens", False, f"JSON parse error: {str(e)}")
         return
     
-    # Step 7: Get NEAR destination tokens and find ETH on Ethereum
-    print("\n[Step 7] GET /api/ds/near/tokens?side=destination")
+    # Step 6b: Get NEAR destination tokens and find ETH on Ethereum
+    print("\n[Step 6b] GET /api/ds/near/tokens?side=destination")
     response, error = make_request("GET", "near/tokens", params={"side": "destination"})
     
     if error:
-        log_test("Step 7: Get NEAR destination tokens", False, error)
+        log_test("Step 6b: Get NEAR destination tokens", False, error)
         return
     
     if response.status_code != 200:
-        log_test("Step 7: Get NEAR destination tokens", False, 
+        log_test("Step 6b: Get NEAR destination tokens", False, 
                 f"Expected 200, got {response.status_code}: {response.text}")
         return
     
     try:
         data = response.json()
         if "tokens" not in data or not isinstance(data["tokens"], list):
-            log_test("Step 7: Get NEAR destination tokens", False, 
+            log_test("Step 6b: Get NEAR destination tokens", False, 
                     f"Expected {{tokens:[...]}} structure, got: {data}")
             return
         
@@ -397,27 +397,27 @@ def test_privacy_swap_near():
                     near_eth_token = token
         
         if not near_eth_token:
-            log_test("Step 7: Get NEAR destination tokens", False, 
+            log_test("Step 6b: Get NEAR destination tokens", False, 
                     f"No Ethereum token found in {len(data['tokens'])} tokens")
             return
         
         near_eth_id = near_eth_token.get("id")
         if not near_eth_id:
-            log_test("Step 7: Get NEAR destination tokens", False, 
+            log_test("Step 6b: Get NEAR destination tokens", False, 
                     "Ethereum token found but has no 'id' field")
             return
         
-        log_test("Step 7: Get NEAR destination tokens", True, 
+        log_test("Step 6b: Get NEAR destination tokens", True, 
                 f"Found {len(data['tokens'])} tokens, {near_eth_token.get('symbol', 'unknown')} (Ethereum) id: {near_eth_id}", 
                 {"token_count": len(data["tokens"]), "near_eth_id": near_eth_id})
         
     except Exception as e:
-        log_test("Step 7: Get NEAR destination tokens", False, f"JSON parse error: {str(e)}")
+        log_test("Step 6b: Get NEAR destination tokens", False, f"JSON parse error: {str(e)}")
         return
     
-    # Step 8: Create NEAR quote
+    # Step 7: Create NEAR quote
     amount = generate_random_amount()
-    print(f"\n[Step 8] POST /api/ds/near/quote")
+    print(f"\n[Step 7] POST /api/ds/near/quote")
     quote_payload = {
         "from": near_sol_id,
         "to": near_eth_id,
@@ -428,11 +428,11 @@ def test_privacy_swap_near():
     response, error = make_request("POST", "near/quote", json_data=quote_payload)
     
     if error:
-        log_test("Step 8: Create NEAR quote", False, error)
+        log_test("Step 7: Create NEAR quote", False, error)
         return
     
     if response.status_code != 200:
-        log_test("Step 8: Create NEAR quote", False, 
+        log_test("Step 7: Create NEAR quote", False, 
                 f"Expected 200, got {response.status_code}: {response.text}")
         return
     
@@ -442,22 +442,22 @@ def test_privacy_swap_near():
         missing_keys = [k for k in required_keys if k not in data]
         
         if missing_keys:
-            log_test("Step 8: Create NEAR quote", False, 
+            log_test("Step 7: Create NEAR quote", False, 
                     f"NEAR quote missing required keys: {missing_keys}")
             return
         
         near_quote_id = data["quoteId"]
-        log_test("Step 8: Create NEAR quote", True, 
+        log_test("Step 7: Create NEAR quote", True, 
                 f"NEAR quote created: quoteId={near_quote_id}, amountOut={data['amountOut']}, estimatedSeconds={data['estimatedSeconds']}", 
                 {"quoteId": near_quote_id, "amountOut": data["amountOut"]})
         
     except Exception as e:
-        log_test("Step 8: Create NEAR quote", False, f"JSON parse error: {str(e)}")
+        log_test("Step 7: Create NEAR quote", False, f"JSON parse error: {str(e)}")
         return
     
-    # Step 9: Create NEAR order
+    # Step 8: Create NEAR order
     request_id = str(uuid.uuid4())
-    print(f"\n[Step 9] POST /api/ds/near/orders")
+    print(f"\n[Step 8] POST /api/ds/near/orders")
     order_payload = {
         "quoteId": near_quote_id,
         "requestId": request_id
@@ -465,52 +465,152 @@ def test_privacy_swap_near():
     response, error = make_request("POST", "near/orders", json_data=order_payload)
     
     if error:
-        log_test("Step 9: Create NEAR order", False, error)
+        log_test("Step 8: Create NEAR order", False, error)
         return
     
     if response.status_code != 200:
-        log_test("Step 9: Create NEAR order", False, 
+        log_test("Step 8: Create NEAR order", False, 
                 f"Expected 200, got {response.status_code}: {response.text}")
         return
     
     try:
         data = response.json()
-        required_keys = ["depositAddress", "requestId", "status"]
+        required_keys = ["depositAddress", "requestId"]
         missing_keys = [k for k in required_keys if k not in data]
         
         if missing_keys:
-            log_test("Step 9: Create NEAR order", False, 
+            log_test("Step 8: Create NEAR order", False, 
                     f"NEAR order missing required keys: {missing_keys}")
             return
         
-        log_test("Step 9: Create NEAR order", True, 
-                f"NEAR order created: depositAddress={data['depositAddress']}, requestId={data['requestId']}, status={data['status']}", 
-                {"depositAddress": data["depositAddress"], "status": data["status"]})
+        log_test("Step 8: Create NEAR order", True, 
+                f"NEAR order created: depositAddress={data['depositAddress']}, requestId={data['requestId']}", 
+                {"depositAddress": data["depositAddress"], "requestId": data["requestId"]})
         
     except Exception as e:
-        log_test("Step 9: Create NEAR order", False, f"JSON parse error: {str(e)}")
+        log_test("Step 8: Create NEAR order", False, f"JSON parse error: {str(e)}")
+        return
+    
+    # Step 9: Get NEAR order status
+    print(f"\n[Step 9] GET /api/ds/near/orders/{request_id}")
+    response, error = make_request("GET", f"near/orders/{request_id}")
+    
+    if error:
+        log_test("Step 9: Get NEAR order status", False, error)
+        return
+    
+    if response.status_code != 200:
+        log_test("Step 9: Get NEAR order status", False, 
+                f"Expected 200, got {response.status_code}: {response.text}")
+        return
+    
+    try:
+        data = response.json()
+        # Check for status or routeStatus field
+        if "status" not in data and "routeStatus" not in data:
+            log_test("Step 9: Get NEAR order status", False, 
+                    f"Order status missing 'status' or 'routeStatus' field: {data}")
+            return
+        
+        status_field = data.get("status") or data.get("routeStatus")
+        log_test("Step 9: Get NEAR order status", True, 
+                f"NEAR order status retrieved: status={status_field}", 
+                {"status": status_field})
+        
+    except Exception as e:
+        log_test("Step 9: Get NEAR order status", False, f"JSON parse error: {str(e)}")
         return
 
 
+def test_cache_behavior():
+    """Test Step 10: Cache behavior - call tokens twice, verify both return 200 and are consistent"""
+    print("\n" + "="*80)
+    print("TESTING CACHE BEHAVIOR")
+    print("="*80)
+    
+    print("\n[Step 10] GET /api/ds/tokens?side=source (first call)")
+    start_time = time.time()
+    response1, error1 = make_request("GET", "tokens", params={"side": "source"}, retry_on_502=False)
+    first_duration = time.time() - start_time
+    
+    if error1:
+        log_test("Step 10: Cache test (first call)", False, error1)
+        return
+    
+    if response1.status_code != 200:
+        log_test("Step 10: Cache test (first call)", False, 
+                f"Expected 200, got {response1.status_code}: {response1.text}")
+        return
+    
+    try:
+        data1 = response1.json()
+        token_count1 = len(data1.get("tokens", []))
+    except Exception as e:
+        log_test("Step 10: Cache test (first call)", False, f"JSON parse error: {str(e)}")
+        return
+    
+    # Second call should be served from cache (much faster)
+    print(f"\n[Step 10] GET /api/ds/tokens?side=source (second call - should be cached)")
+    start_time = time.time()
+    response2, error2 = make_request("GET", "tokens", params={"side": "source"}, retry_on_502=False)
+    second_duration = time.time() - start_time
+    
+    if error2:
+        log_test("Step 10: Cache test (second call)", False, error2)
+        return
+    
+    if response2.status_code != 200:
+        log_test("Step 10: Cache test (second call)", False, 
+                f"Expected 200, got {response2.status_code}: {response2.text}")
+        return
+    
+    try:
+        data2 = response2.json()
+        token_count2 = len(data2.get("tokens", []))
+    except Exception as e:
+        log_test("Step 10: Cache test (second call)", False, f"JSON parse error: {str(e)}")
+        return
+    
+    # Verify both calls returned 200 and consistent data
+    if token_count1 == token_count2:
+        log_test("Step 10: Cache behavior test", True, 
+                f"Both calls returned 200 with consistent data ({token_count1} tokens). First: {first_duration:.3f}s, Second: {second_duration:.3f}s (cached)", 
+                {"first_duration": first_duration, "second_duration": second_duration, "token_count": token_count1})
+    else:
+        log_test("Step 10: Cache behavior test", False, 
+                f"Token counts differ: first={token_count1}, second={token_count2}")
+
+
 def test_allowlist_guard():
-    """Test that non-allowed paths are blocked"""
+    """Test Step 11: Allowlist guard - non-allowed paths should be blocked"""
     print("\n" + "="*80)
     print("TESTING ALLOWLIST GUARD")
     print("="*80)
     
-    print("\n[Allowlist Test] GET /api/ds/rewards/config (should be blocked)")
+    print("\n[Step 11] GET /api/ds/rewards/config (should be blocked)")
     response, error = make_request("GET", "rewards/config", retry_on_502=False)
     
     if error:
-        log_test("Allowlist guard test", False, error)
+        log_test("Step 11: Allowlist guard test", False, error)
         return
     
     if response.status_code == 403:
-        log_test("Allowlist guard test", True, 
-                "Non-allowed path correctly blocked with 403", 
-                {"status_code": 403})
+        try:
+            data = response.json()
+            if "error" in data and "not allowed" in data["error"].lower():
+                log_test("Step 11: Allowlist guard test", True, 
+                        f"Non-allowed path correctly blocked with 403 and error message: {data['error']}", 
+                        {"status_code": 403, "error": data["error"]})
+            else:
+                log_test("Step 11: Allowlist guard test", True, 
+                        "Non-allowed path correctly blocked with 403", 
+                        {"status_code": 403})
+        except:
+            log_test("Step 11: Allowlist guard test", True, 
+                    "Non-allowed path correctly blocked with 403", 
+                    {"status_code": 403})
     else:
-        log_test("Allowlist guard test", False, 
+        log_test("Step 11: Allowlist guard test", False, 
                 f"Expected 403 for blocked path, got {response.status_code}: {response.text}")
 
 
@@ -540,15 +640,21 @@ def print_summary():
 
 if __name__ == "__main__":
     print("="*80)
-    print("DarkSwap Passthrough Proxy Test Suite")
+    print("DarkSwap Passthrough Proxy HARDENED Regression Test Suite")
     print("="*80)
     print(f"Base URL: {BASE_URL}")
     print(f"EVM Address: {EVM_ADDRESS}")
     print(f"Solana Address: {SOLANA_ADDRESS}")
+    print("\nTesting HARDENED proxy with:")
+    print("  - Shared httpx keep-alive connection pool")
+    print("  - Automatic retry with exponential backoff on 429/5xx/network errors")
+    print("  - Short TTL in-memory cache (tokens=60s, chains=300s)")
+    print("  - Quotes/orders/status NEVER cached (always live)")
     
     # Run all tests
     test_private_route_houdini()
     test_privacy_swap_near()
+    test_cache_behavior()
     test_allowlist_guard()
     
     # Print summary
