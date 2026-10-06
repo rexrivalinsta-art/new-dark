@@ -25,9 +25,9 @@ export default function HowItWorks() {
         {steps.map((s) => (
           <div
             key={s.n}
-            className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 hover:border-white/20 transition-colors"
+            className="glass glass-hover rounded-2xl p-5"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/40 to-cyan-400/20 border border-white/10 text-sm font-semibold text-white">
               {s.n}
             </div>
             <h3 className="mt-3 font-display text-base font-semibold text-white">{s.title}</h3>

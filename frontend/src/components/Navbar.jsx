@@ -25,7 +25,7 @@ export default function Navbar() {
   const isActive = (to) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/5 bg-[#05080a]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-white/5 bg-[#07060c]/70 backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
         <Link to="/"><Logo /></Link>
 
@@ -54,7 +54,7 @@ export default function Navbar() {
           </a>
           <Link
             to="/swap"
-            className="group inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 transition-all"
+            className="aurora-btn group inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
           >
             Launch app
             <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
@@ -67,7 +67,7 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-white/5 bg-[#05080a] px-5 py-4 space-y-3">
+        <div className="md:hidden border-t border-white/5 bg-[#07060c] px-5 py-4 space-y-3">
           {[...links, { label: 'Track order', to: '/track' }].map((l) => (
             <Link key={l.label} to={l.to} onClick={() => setOpen(false)}
               className="block text-sm text-white/80 hover:text-white">{l.label}</Link>
@@ -77,7 +77,7 @@ export default function Navbar() {
             <XIcon className="h-3.5 w-3.5" /> Follow on X
           </a>
           <Link to="/swap" onClick={() => setOpen(false)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black">
+            className="aurora-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold">
             Launch app <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

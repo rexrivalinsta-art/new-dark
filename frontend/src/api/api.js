@@ -45,8 +45,22 @@ export const createOrder = (body) =>
 export const getOrder = (id) => req(`${DS}/orders/${id}`);
 
 /* ---------------- Privacy swap (NEAR Intents) ---------------- */
+// NEAR Intents tokens have no icon/name from upstream — enrich them so the
+// selector and cards show real coin logos (falls back to a letter badge).
+const nearIcon = (symbol) => {
+  const s = (symbol || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!s) return '';
+  return `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/128/color/${s}.png`;
+};
+
+const enrichNear = (t) => ({
+  ...t,
+  name: t.name || t.symbol,
+  icon: t.icon || nearIcon(t.symbol),
+});
+
 export const getNearTokens = (side, term = '') =>
-  req(`${DS}/near/tokens?${qp({ side, term })}`).then((d) => d.tokens || []);
+  req(`${DS}/near/tokens?${qp({ side, term })}`).then((d) => (d.tokens || []).map(enrichNear));
 
 export const getNearQuote = (body) =>
   req(`${DS}/near/quote`, {

@@ -14,7 +14,7 @@ export default function SwapPage() {
           <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.1] tracking-tight">
             Swap from Solana
             <br />
-            to another chain.
+            <span className="text-gradient">to another chain.</span>
           </h1>
           <p className="mt-4 text-white/50">Live quote, your review, a manual deposit.</p>
         </section>

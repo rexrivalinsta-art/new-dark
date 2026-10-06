@@ -33,7 +33,7 @@ export default function AssetSelector({
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? onOpenChange(true) : close())}>
-      <DialogContent className="max-w-md border-white/10 bg-[#0d0d12] p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-md border-white/10 bg-[#0e0b16] p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="font-display text-lg">
             {mode === 'solana'
@@ -53,7 +53,7 @@ export default function AssetSelector({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or symbol"
-                className="pl-9 bg-white/5 border-white/10 focus-visible:ring-white/40"
+                className="pl-9 bg-white/5 border-white/10 focus-visible:ring-violet-500/60"
               />
             </div>
           </div>

@@ -41,8 +41,8 @@ function Tracker({ idx }) {
         return (
           <div key={label} className="flex items-center gap-3">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
-              done ? 'border-white/40 bg-white/15 text-white'
-                : active ? 'border-white/50 bg-white/15 text-white'
+              done ? 'border-violet-400/50 bg-gradient-to-br from-violet-500/30 to-cyan-400/15 text-violet-200'
+                : active ? 'border-violet-400/60 bg-gradient-to-br from-violet-500/30 to-cyan-400/15 text-violet-200'
                 : 'border-white/10 bg-white/5 text-white/30'}`}>
               {done ? <Check className="h-4 w-4" /> : active ? <CircleDot className="h-4 w-4 animate-pulse" /> : <Clock className="h-3.5 w-3.5" />}
             </div>
@@ -68,14 +68,14 @@ function OrderCard({ local, live }) {
   return (
     <div className="swap-card rounded-3xl border border-white/10 p-5 sm:p-6 shadow-2xl shadow-black/60">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-white/70 font-medium">
+        <div className="text-xs text-violet-200 font-medium">
           {local?.method === 'privacy' ? 'Privacy swap · Shielded' : 'Private route · Best rate'}
         </div>
         <span className="font-mono text-xs text-white/50 truncate max-w-[45%]">{local?.id || live?.houdiniId || live?.requestId}</span>
       </div>
 
       <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs">
-        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-violet-400 to-cyan-400 animate-pulse" />
         {statusStr.replace(/_/g, ' ')}
       </div>
 
@@ -103,8 +103,8 @@ function OrderCard({ local, live }) {
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
             <code className="text-xs break-all text-white/90">{deposit}</code>
             <button onClick={() => { navigator.clipboard?.writeText(deposit); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-              className="ml-auto shrink-0 text-white/60 hover:text-white transition-colors">
-              {copied ? <Check className="h-4 w-4 text-white" /> : <Copy className="h-4 w-4" />}
+              className="ml-auto shrink-0 text-white/60 hover:text-violet-300 transition-colors">
+              {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4" />}
             </button>
           </div>
         </div>
@@ -185,7 +185,7 @@ export default function TrackOrderPage() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-white/30 font-mono"
           />
           <button onClick={() => doSearch(query)} disabled={loading}
-            className="shrink-0 rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-white/90 transition-all disabled:opacity-60">
+            className="aurora-btn shrink-0 rounded-lg px-4 py-1.5 text-sm font-semibold disabled:opacity-60">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Track'}
           </button>
         </div>

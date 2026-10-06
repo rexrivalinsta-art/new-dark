@@ -4,7 +4,7 @@ import CoinIcon from './CoinIcon';
 import TokenSelector from './TokenSelector';
 import OrderModal from './OrderModal';
 import {
-  getTokens, getQuotes, bestQuote, createOrder,
+  getTokens, getQuotes, createOrder,
   getNearTokens, getNearQuote, createNearOrder, saveLocalOrder,
 } from '../api/api';
 
@@ -13,12 +13,20 @@ const METHODS = [
   { id: 'privacy', label: 'Privacy swap', sub: 'Shielded settlement' },
 ];
 
+const REFRESH_SECS = 60;
+
 const fmt = (n) => {
   const x = Number(n);
   if (!isFinite(x) || x === 0) return '0';
   if (x >= 1000) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
   if (x >= 1) return x.toLocaleString(undefined, { maximumFractionDigits: 4 });
   return x.toLocaleString(undefined, { maximumFractionDigits: 8 });
+};
+
+const usd = (n) => {
+  const x = Number(n);
+  if (!isFinite(x) || x <= 0) return null;
+  return '$' + x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 function MethodTabs({ method, setMethod }) {
@@ -32,12 +40,12 @@ function MethodTabs({ method, setMethod }) {
             onClick={() => setMethod(m.id)}
             className={`rounded-xl py-2.5 text-center transition-all ${
               active
-                ? 'bg-white text-black shadow-lg shadow-white/10'
+                ? 'aurora-btn shadow-lg'
                 : 'text-white/60 hover:text-white hover:bg-white/5'
             }`}
           >
             <div className="text-sm font-semibold">{m.label}</div>
-            <div className={`text-[0.68rem] ${active ? 'text-black/55' : 'text-white/35'}`}>{m.sub}</div>
+            <div className={`text-[0.68rem] ${active ? 'text-white/70' : 'text-white/35'}`}>{m.sub}</div>
           </button>
         );
       })}
@@ -72,9 +80,12 @@ export default function SwapCard() {
   const [destination, setDestination] = useState('');
   const [refund, setRefund] = useState('');
 
-  const [quote, setQuote] = useState(null);
+  const [routes, setRoutes] = useState([]);       // normalized route list
+  const [routeIdx, setRouteIdx] = useState(0);
   const [quoting, setQuoting] = useState(false);
   const [quoteErr, setQuoteErr] = useState('');
+  const [validUntil, setValidUntil] = useState(0); // ms timestamp for refresh countdown
+  const [now, setNow] = useState(Date.now());
 
   const [selOpen, setSelOpen] = useState(false);
   const [selSide, setSelSide] = useState('source');
@@ -85,12 +96,17 @@ export default function SwapCard() {
   const reqId = useRef(0);
 
   const isNear = method === 'privacy';
+  const amt = parseFloat(amount);
+  const validDest = destination.trim().length >= 20;
+  const validRefund = refund.trim().length >= 20;
+  const selected = routes[routeIdx] || null;
 
   // reset token-specific state when the method (token universe) changes
   useEffect(() => {
     setSendToken(null);
     setRecvToken(null);
-    setQuote(null);
+    setRoutes([]);
+    setRouteIdx(0);
     setQuoteErr('');
   }, [method]);
 
@@ -103,54 +119,86 @@ export default function SwapCard() {
     [isNear]
   );
 
-  const amt = parseFloat(amount);
-  const validDest = destination.trim().length >= 20;
-  const validRefund = refund.trim().length >= 20;
-
-  // live quote
-  useEffect(() => {
-    setQuoteErr('');
+  const fetchQuote = useCallback(async () => {
+    const amtNum = parseFloat(amount);
     const ready =
-      sendToken && recvToken && amt > 0 &&
+      sendToken && recvToken && amtNum > 0 &&
       (!isNear || (validDest && validRefund));
     if (!ready) {
-      setQuote(null);
+      setRoutes([]);
       setQuoting(false);
+      setQuoteErr('');
       return;
     }
     const id = ++reqId.current;
     setQuoting(true);
-    const h = setTimeout(async () => {
-      try {
-        if (isNear) {
-          const q = await getNearQuote({
-            from: sendToken.id, to: recvToken.id, amount,
-            recipient: destination.trim(), refundTo: refund.trim(),
-          });
-          if (id !== reqId.current) return;
-          const out = parseFloat(q.amountOut);
-          setQuote({
-            quoteId: q.quoteId, out, eta: q.estimatedSeconds,
-            usdIn: amt * (sendToken.price || 0), usdOut: out * (recvToken.price || 0),
-          });
+    setQuoteErr('');
+    try {
+      if (isNear) {
+        const q = await getNearQuote({
+          from: sendToken.id, to: recvToken.id, amount,
+          recipient: destination.trim(), refundTo: refund.trim(),
+        });
+        if (id !== reqId.current) return;
+        const out = parseFloat(q.amountOut);
+        const r = {
+          quoteId: q.quoteId,
+          out,
+          usdIn: amtNum * (sendToken.price || 0),
+          usdOut: out * (recvToken.price || 0),
+          etaMin: q.estimatedSeconds ? Math.max(1, Math.round(q.estimatedSeconds / 60)) : null,
+          min: q.min, max: q.max,
+        };
+        setRoutes([r]);
+        setRouteIdx(0);
+        setValidUntil(q.validUntil ? new Date(q.validUntil).getTime() : Date.now() + REFRESH_SECS * 1000);
+      } else {
+        const quotes = await getQuotes({ amount, from: sendToken.id, to: recvToken.id });
+        if (id !== reqId.current) return;
+        if (!quotes || !quotes.length) {
+          setRoutes([]);
+          setQuoteErr('No route available for this pair. Try a different asset or amount.');
         } else {
-          const quotes = await getQuotes({ amount, from: sendToken.id, to: recvToken.id });
-          const q = bestQuote(quotes);
-          if (id !== reqId.current) return;
-          if (!q) { setQuote(null); setQuoteErr('No route available for this pair.'); }
-          else setQuote({
-            quoteId: q.quoteId, out: q.amountOut, eta: q.duration,
-            usdIn: q.amountInUsd, usdOut: q.amountOutUsd,
-          });
+          const sorted = [...quotes].sort((a, b) => b.amountOut - a.amountOut).slice(0, 6);
+          const rs = sorted.map((q) => ({
+            quoteId: q.quoteId,
+            out: q.amountOut,
+            usdIn: q.amountInUsd,
+            usdOut: q.amountOutUsd,
+            etaMin: q.duration ? Math.max(1, Math.round(q.duration)) : null,
+            min: q.min, max: q.max,
+          }));
+          setRoutes(rs);
+          setRouteIdx(0);
+          setValidUntil(Date.now() + REFRESH_SECS * 1000);
         }
-      } catch (e) {
-        if (id === reqId.current) { setQuote(null); setQuoteErr(e.message); }
-      } finally {
-        if (id === reqId.current) setQuoting(false);
       }
-    }, 550);
+    } catch (e) {
+      if (id === reqId.current) { setRoutes([]); setQuoteErr(e.message); }
+    } finally {
+      if (id === reqId.current) setQuoting(false);
+    }
+  }, [sendToken, recvToken, amount, isNear, destination, refund, validDest, validRefund]);
+
+  // debounced quote on input change
+  useEffect(() => {
+    const h = setTimeout(fetchQuote, 550);
     return () => clearTimeout(h);
-  }, [sendToken, recvToken, amount, amt, isNear, destination, refund, validDest, validRefund]);
+  }, [fetchQuote]);
+
+  // 1s ticker for the refresh countdown
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const secsLeft = validUntil ? Math.max(0, Math.round((validUntil - now) / 1000)) : 0;
+
+  // auto-refresh the quote when the countdown hits zero
+  useEffect(() => {
+    if (routes.length && secsLeft <= 0 && !quoting) fetchQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secsLeft]);
 
   const openSel = (side) => { setSelSide(side); setSelOpen(true); };
 
@@ -161,16 +209,16 @@ export default function SwapCard() {
     } catch { /* clipboard blocked */ }
   };
 
-  const canReview = sendToken && recvToken && quote && validDest && (!isNear || validRefund) && !quoting && !submitting;
+  const canReview = sendToken && recvToken && selected && validDest && (!isNear || validRefund) && !quoting && !submitting;
 
   let cta = 'Review swap';
   if (!sendToken) cta = 'Choose the asset you send';
   else if (!amt || amt <= 0) cta = 'Enter an amount';
   else if (!recvToken) cta = 'Pick an asset to receive';
-  else if (!validDest) cta = 'Enter a destination address';
   else if (isNear && !validRefund) cta = 'Enter your Solana refund address';
+  else if (!validDest) cta = 'Enter a destination address';
   else if (quoteErr) cta = 'No quote — adjust and retry';
-  else if (quoting || !quote) cta = 'Fetching quote…';
+  else if (quoting || !selected) cta = 'Fetching quote…';
 
   const doReview = async () => {
     if (!canReview) return;
@@ -181,7 +229,7 @@ export default function SwapCard() {
       if (isNear) {
         const rid = (crypto.randomUUID && crypto.randomUUID()) ||
           'req-' + Math.random().toString(16).slice(2);
-        const o = await createNearOrder({ quoteId: quote.quoteId, requestId: rid });
+        const o = await createNearOrder({ quoteId: selected.quoteId, requestId: rid });
         rec = {
           id: o.requestId, method, depositAddress: o.depositAddress,
           depositMemo: o.depositMemo || null, addressTo: o.recipient,
@@ -192,7 +240,7 @@ export default function SwapCard() {
           expires: o.deadline, eta: o.estimatedSeconds, createdAt: Date.now(),
         };
       } else {
-        const o = await createOrder({ quoteId: quote.quoteId, addressTo: destination.trim() });
+        const o = await createOrder({ quoteId: selected.quoteId, addressTo: destination.trim() });
         rec = {
           id: o.houdiniId, method, depositAddress: o.depositAddress,
           depositMemo: null, addressTo: o.receiverAddress || destination.trim(),
@@ -212,8 +260,10 @@ export default function SwapCard() {
     }
   };
 
+  const usdIn = selected ? usd(selected.usdIn) : (sendToken && amt > 0 ? usd(amt * (sendToken.price || 0)) : null);
+
   return (
-    <div className="swap-card rounded-3xl border border-white/10 p-4 sm:p-5 shadow-2xl shadow-black/60">
+    <div className="swap-card rounded-3xl border border-white/10 p-4 sm:p-5">
       <MethodTabs method={method} setMethod={setMethod} />
 
       {/* You send */}
@@ -233,18 +283,17 @@ export default function SwapCard() {
           <TokenButton token={sendToken} onClick={() => openSel('source')} />
         </div>
         <div className="flex items-center justify-between mt-2 text-xs">
-          <span className="text-white/40">
-            {sendToken ? sendToken.name : 'Pick a Solana asset'}
-            {quote && quote.usdIn ? <span className="text-white/55"> · ${fmt(quote.usdIn)}</span> : null}
+          <span className="text-white/45">
+            {usdIn ? <>&asymp; {usdIn}</> : (sendToken ? sendToken.name : 'Pick a Solana asset')}
           </span>
-          <span className="text-white/40">Live quote</span>
+          <span className="text-white/40">Min $3.00</span>
         </div>
       </div>
 
       {/* direction */}
       <div className="relative flex justify-center my-1">
-        <div className="h-9 w-9 rounded-xl border border-white/10 bg-[#121218] flex items-center justify-center">
-          <ArrowDown className="h-4 w-4 text-white" />
+        <div className="h-9 w-9 rounded-xl border border-white/10 bg-[#141020] flex items-center justify-center">
+          <ArrowDown className="h-4 w-4 text-violet-300" />
         </div>
       </div>
 
@@ -258,33 +307,85 @@ export default function SwapCard() {
         </div>
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3.5">
           <div className="w-full text-2xl font-display font-medium overflow-hidden">
-            {quoting ? (
+            {quoting && !selected ? (
               <span className="inline-flex items-center gap-2 text-white/40 text-lg">
                 <Loader2 className="h-4 w-4 animate-spin" /> fetching…
               </span>
             ) : (
-              <span className={quote ? 'text-white' : 'text-white/25'}>{quote ? fmt(quote.out) : '0.00'}</span>
+              <span className={selected ? 'text-white' : 'text-white/25'}>{selected ? fmt(selected.out) : '0.00'}</span>
             )}
           </div>
           <TokenButton token={recvToken} onClick={() => openSel('destination')} />
         </div>
+
+        {/* rate + live */}
         <div className="flex items-center justify-between mt-2 text-xs gap-2">
-          <span className="text-white/40 truncate">
-            {recvToken ? `${recvToken.name} on ${recvToken.chainName}` : 'Pick a network, then an asset'}
+          <span className="text-white/45 truncate">
+            {selected && sendToken && recvToken && amt > 0
+              ? <>1 {sendToken.symbol} &asymp; {fmt(selected.out / amt)} {recvToken.symbol}</>
+              : (recvToken ? `${recvToken.name} on ${recvToken.chainName}` : 'Pick a network, then an asset')}
           </span>
-          {quote && sendToken && recvToken && (
-            <span className="text-white/40 shrink-0">
-              1 {sendToken.symbol} ≈ {fmt(quote.out / amt)} {recvToken.symbol} · ~{quote.eta}s
+          {selected && (
+            <span className="inline-flex items-center gap-1.5 shrink-0 text-white/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-violet-400 to-cyan-400 animate-pulse" /> Live
             </span>
           )}
         </div>
       </div>
 
+      {/* Route cards + details (parity with original) */}
+      {selected && (
+        <div className="mt-4 space-y-3">
+          {routes.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {routes.map((r, i) => {
+                const active = i === routeIdx;
+                return (
+                  <button
+                    key={r.quoteId}
+                    onClick={() => setRouteIdx(i)}
+                    className={`shrink-0 rounded-xl border px-3.5 py-2 text-left transition-colors ${
+                      active ? 'border-violet-400/60 bg-violet-500/10' : 'border-white/10 bg-white/[0.02] hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="text-[0.65rem] uppercase tracking-wider text-white/40">Route {i + 1}</div>
+                    <div className="mt-0.5 font-mono text-sm">{fmt(r.out)} {recvToken.symbol}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5">
+              <div className="text-[0.65rem] uppercase tracking-wider text-white/40">Route fee</div>
+              <div className="mt-0.5 font-mono text-xs text-white/85">In final quote</div>
+            </div>
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5">
+              <div className="text-[0.65rem] uppercase tracking-wider text-white/40">Expected time</div>
+              <div className="mt-0.5 font-mono text-xs text-white/85">{selected.etaMin ? `~${selected.etaMin} min` : '—'}</div>
+            </div>
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5">
+              <div className="text-[0.65rem] uppercase tracking-wider text-white/40">Quote</div>
+              <div className="mt-0.5 font-mono text-xs text-white/85">
+                {quoting ? 'refreshing…' : `New in ${secsLeft}s`}
+              </div>
+            </div>
+          </div>
+
+          {sendToken && selected.min != null && selected.max != null && (
+            <p className="text-xs text-white/40">
+              Limits {fmt(selected.min)}&ndash;{fmt(selected.max)} {sendToken.symbol}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Destination address */}
       <div className="mt-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-white/80">Destination address</span>
-          <span className="text-xs text-white/40">{recvToken ? `${recvToken.chainName} chain` : 'Destination chain'}</span>
+          <span className="text-xs text-white/40">{recvToken ? `${recvToken.symbol} on ${recvToken.chainName}` : 'Destination chain'}</span>
         </div>
         <div className="glow-ring flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition-shadow">
           <input
@@ -334,7 +435,7 @@ export default function SwapCard() {
         disabled={!canReview}
         className={`mt-5 w-full rounded-2xl py-3.5 text-sm font-semibold transition-all inline-flex items-center justify-center gap-2 ${
           canReview
-            ? 'bg-white text-black hover:bg-white/90 shadow-lg shadow-white/10'
+            ? 'aurora-btn'
             : 'bg-white/5 text-white/40 cursor-not-allowed'
         }`}
       >
